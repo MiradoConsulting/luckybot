@@ -1,95 +1,135 @@
-import robocode.*;
-import robocode.util.*;
-import java.awt.*;
+import java.awt.Color;
+import robocode.AdvancedRobot;
+import robocode.HitByBulletEvent;
+import robocode.ScannedRobotEvent;
+import robocode.util.Utils;
  
-/**
- * SuperWalls - a sample robot by CrazyBassoonist based on the sample robot Walls by Mathew Nelson and maintained by Flemming N. Larsen
- * Moves around the outer edge with two targeting systems
+/*
+ * SuperBoxBot - a SuperSampleBot by Exauge
+ * 
+ * This robot demonstrates basic melee strategy such as
+ *  -Picking targets
+ *  -Melee movement strategy
+ *  
+ *  It also demonstrates some of the Java API operators including
+ *  remainder and ternary.
+ *  
+ *  If you need help with any of these operators look here:
+ *  http://download.oracle.com/javase/tutorial/java/nutsandbolts/opsummary.html
+ *  A bit of googling always helps too.
+ * 
+ * Movement:
+ * This robot goes to the nearest corner, and then moves in a box.
+ * There is a 15% chance it will change direction when the enemy fires.
+ * 
+ * Targeting:
+ * At first this robot will target the first robot it sees, but it switches
+ * to any robot that hits it. It uses Head-on targeting which is popular
+ * among lightweight melee bots.
  */
-public class LuckyBot extends AdvancedRobot {
-	static int HGShots;     //Number of shots with Head-On Targeting
-	static int LGShots;     //Number of shots with Linear Targeting
-	static int HGHits;      //Number of hits with Head-On Targeting
-	static int LGHits;      //Number of hits with Linear Targeting
-	boolean gunIdent;       //Used to tell which gun we are using
-	int dir = 1;
-	double energy;
-	static int enemyFireCount = 0;
+public class LuckyBot extends AdvancedRobot{
  
-	public void run() {
-		setAdjustRadarForRobotTurn(true);
-		setAdjustRadarForGunTurn(true);
-		setBodyColor(Color.black);
-		setGunColor(Color.black);
-		setRadarColor(Color.orange);
-		setBulletColor(Color.cyan);
-		setScanColor(Color.cyan);
+   private boolean moved = false; // if we need to move or turn
+   private boolean inCorner = false; // if we are in a corner
+   private String targ; // what robot to target
+   private byte spins = 0; // spin counter
+   private byte dir = 1; // direction to move
+   private short prevE; // previous energy of robot we're targeting
  
-		setTurnRadarRight(Double.POSITIVE_INFINITY);
+   @Override
+   public void run(){
+      setColors(Color.PINK, Color.BLACK, Color.CYAN); // set the colors
+      setAdjustGunForRobotTurn(true); // when the robot turns, adjust gun in opposite dir
+      setAdjustRadarForGunTurn(true); // when the gun turns, adjust radar in opposite dir
+      while(true){ // for radar lock (aka "Narrow Lock")
+         turnRadarLeftRadians(1); // continually turn the radar left
+      }
+   }
  
-		// turnLeft to face a wall.
-		// getHeading() % 90 means the remainder of
-		// getHeading() divided by 90.
-		turnLeft(getHeading() % 90);
+   @Override
+   public void onHitByBullet(HitByBulletEvent e){ // if hit buy a bullet
+      targ = e.getName(); // target the one who hit us!
+   }
  
-		while (true) {
-			//if (getDistanceRemaining() == 0) {
-			//	turnRight(90 * dir);
-				if (Utils.isNear(getHeadingRadians(), 0D) || Utils.isNear(getHeadingRadians(), Math.PI)) {
-					ahead((Math.max(getBattleFieldHeight() - getY(), getY()) - 28) * dir);
-				} else {
-					ahead((Math.max(getBattleFieldWidth() - getX(), getX()) - 28) * dir);
-				}
-			turnRight(90 * dir);
-			//}
-		}
-	}
+   @Override
+   public void onScannedRobot(ScannedRobotEvent e){
+      if(targ == null || spins > 6){ // if we don't have a target
+         targ = e.getName(); // choose the first robot scanned
+      }
  
-	/**
-	 * onScannedRobot: Fire!
-	 */
-	public void onScannedRobot(ScannedRobotEvent e) {
-		double absBearing = e.getBearingRadians() + getHeadingRadians();                // The enemies location relative to us
-		double latVel = e.getVelocity() * Math.sin(e.getHeadingRadians() - absBearing); // The enemies lateral velocity
-		double radarTurn = absBearing - getRadarHeadingRadians();                       // The amount to turn our radar
+      if(getDistanceRemaining() == 0 && getTurnRemaining() == 0){ // not moving or turning
+         if(inCorner){
+            if(moved){ // if last movement cycle we were moving,
+               setTurnLeft(90); // turn this cycle
+               moved = false; // and move next cycle
+            }
+            else{ // else if last cycle we were turning
+               setAhead(160 * dir); // move this cycle
+               moved = true; // and turn next cycle
+            }
+         }
+         else{
+            // if we aren't going N/S go north or south
+            if((getHeading() % 90) != 0){
+               setTurnLeft((getY() > (getBattleFieldHeight() / 2)) ? getHeading()
+                     : getHeading() - 180);
+            }
+            // if we aren't at the top or bottom, go to whichever is closer
+            else if(getY() > 30 && getY() < getBattleFieldHeight() - 30){
+               setAhead(getHeading() > 90 ? getY() - 20 : getBattleFieldHeight() - getY()
+                     - 20);
+            }
+            // if we aren't facing toward East/West, face toward it
+            else if(getHeading() != 90 && getHeading() != 270){
+               if(getX() < 350){
+                  setTurnLeft(getY() > 300 ? 90 : -90);
+               }
+               else{
+                  setTurnLeft(getY() > 300? -90 : 90);
+               }
+            }
+            // if we aren't at the left or right, go to whichever is closer
+            else if(getX() > 30 && getX() < getBattleFieldWidth() - 30){
+               setAhead(getHeading() < 180 ? getX() - 20 : getBattleFieldWidth() - getX()
+                     - 20);
+            }
+            // we are in the corner; turn and start moving
+            else if(getHeading() == 270){
+               setTurnLeft(getY() > 200 ? 90 : 180);
+               inCorner = true;
+            }
+            // we are in the corner; turn and start moving
+            else if(getHeading() == 90){
+               setTurnLeft(getY() > 200 ? 180 : 90);
+               inCorner = true;
+            }
+         }
+      }
+      if(e.getName().equals(targ)){ // if the robot scanned is our target
+         spins = 0; // reset radar spin counter
  
-		double HGRating = (double) HGHits / HGShots;
-		double LGRating = (double) LGHits / LGShots;
+         // if the enemy fires, with a 15% chance, 
+         if((prevE < (prevE = (short)e.getEnergy())) && Math.random() > .85){
+            dir *= -1; // change direction
+         }
  
-		if (energy > (energy = e.getEnergy())) {
-			enemyFireCount++;
-			if (enemyFireCount % 5 == 0) {
-				dir = -dir;
-				if (Utils.isNear(getHeadingRadians(), 0D) || Utils.isNear(getHeadingRadians(), Math.PI)) {
-					setAhead((Math.max(getBattleFieldHeight() - getY(), getY()) - 28) * dir);
-				} else {
-					setAhead((Math.max(getBattleFieldWidth() - getX(), getX()) - 28) * dir);
-				}
-			}
-		}
+         setTurnGunRightRadians(Utils.normalRelativeAngle((getHeadingRadians() + e
+               .getBearingRadians()) - getGunHeadingRadians())); // move gun toward them
  
-		setMaxVelocity(Math.random() * 12);
+         if(e.getDistance() < 200){ // the the enemy is further than 200px
+            setFire(3); // fire full power
+         }
+         else{
+            setFire(2.4); // else fire 2.4
+         }
  
-		if ((getRoundNum() == 0 || LGRating > HGRating) && getRoundNum() != 1){ // In the first round or when linear gun got more hitting percentage use linear targeting
-			double bulletPower = Math.min(3, e.getEnergy() / 4);
-			setTurnGunRightRadians(Utils.normalRelativeAngle(absBearing - getGunHeadingRadians() + Math.asin(latVel / (20 - 3 * bulletPower))));
-			LGShots++;
-			gunIdent = true;
-			setFire(bulletPower); // Fire the minimum amount of energy needed to finish off the other robot
-		} else { // in second round or when the head-on gun got more hitting percentage, use head-on gun.
-			setTurnGunRightRadians(Utils.normalRelativeAngle(absBearing - getGunHeadingRadians()));
-			HGShots++;
-			gunIdent = false;
-			setFire(e.getEnergy() / 4); // Fire the minimum amount of energy needed to finish off the other robot
-		}
-		setTurnRadarRightRadians(Utils.normalRelativeAngle(radarTurn) * 2); // Make the radar lock on
-	}
+         double radarTurn = getHeadingRadians() + e.getBearingRadians()
+               - getRadarHeadingRadians();
+         setTurnRadarRightRadians(2 * Utils.normalRelativeAngle(radarTurn)); // lock radar
+      }
+      else if(targ != null){ // else
+         spins++; // add one to spin count
+      }
+   }
  
-	public void onBulletHit(BulletHitEvent e) {
-		if(gunIdent) {
-			LGHits = LGHits+1;
-		} else {
-			HGHits = HGHits+1;
-		}
-	}
 }
