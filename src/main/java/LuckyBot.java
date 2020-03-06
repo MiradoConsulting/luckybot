@@ -4,9 +4,9 @@ import robocode.*;
 public class LuckyBot extends Robot {
     public void run() {
         while (true) {
-            ahead(2000);
+            ahead(1500);
             turnGunRight(360);
-            back(2000);
+            back(1500);
             turnGunRight(360);
         }
     }
