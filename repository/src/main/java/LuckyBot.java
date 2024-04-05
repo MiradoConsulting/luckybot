@@ -1,6 +1,8 @@
 import robocode.DeathEvent;
 import robocode.Robot;
 import robocode.ScannedRobotEvent;
+import robocode.HitWallEvent;
+import robocode.HitRobotEvent;
 import static robocode.util.Utils.normalRelativeAngleDegrees;
 
 import java.awt.*;
@@ -9,48 +11,27 @@ import java.awt.*;
 public class LuckyBot extends Robot {
 
 	public void run() {
-		setBodyColor(Color.red);
-		setGunColor(Color.black);
-		setRadarColor(Color.yellow);
-		setBulletColor(Color.green);
-		setScanColor(Color.green);
-
-		// Move to a corner
-		goCorner();
-
-		int gunIncrement = 3;
+	
+		turnRight(normalRelativeAngleDegrees(0 - getHeading()));
 
 		while (true) {
-			turnLeft(90);
-			ahead(5000);
+			ahead(100);
+			turnGunLeft(-180);
+			turnGunRight(-180);
 		}
 	}
 
-	public void goCorner() {
-		turnRight(normalRelativeAngleDegrees(0 - getHeading()));
-		// Move to that wall
-		ahead(5000);
-		// Turn to face the corner
-		turnLeft(90);
-		// Move to the corner
-		ahead(5000);
-		// Turn gun to starting point
-		turnGunLeft(90);
-	}
+   public void onHitWall(HitWallEvent event) {
+			turnLeft(90);
+   }
+
+   public void onHitRobot(HitRobotEvent event) {
+			turnLeft(90);
+   }
 
 	public void onScannedRobot(ScannedRobotEvent e) {
-		smartFire(e.getDistance());
-	}
-
-	public void smartFire(double robotDistance) {
-		if (robotDistance > 400) {
-			return;
-		} else if (robotDistance > 200 || getEnergy() < 15) {
-			fire(1);
-		} else if (robotDistance > 50) {
-			fire(2);
-		} else {
-			fire(3);
-		}
+		double gunTurnAmt = normalRelativeAngleDegrees(e.getBearing() + (getHeading() - getRadarHeading()));
+		turnGunRight(gunTurnAmt);
+		fire(1);
 	}
 }
